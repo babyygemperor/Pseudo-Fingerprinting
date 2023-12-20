@@ -19,7 +19,8 @@ def add_headers(response):
 
 @app.route('/')
 def home():
-   return render_template('index.html')
+    return render_template('index.html')
+
 
 @app.route('/collect', methods=['POST'])
 def collect_fingerprint():
