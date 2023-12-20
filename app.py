@@ -26,6 +26,10 @@ def home():
 def collect_fingerprint():
     data = request.json
     json_str = json.dumps(data, indent=2)
+    with open('data.json', 'a') as f:
+        json.dump(data, f)
+        f.write("\n")
+
     print("Received fingerprint data:", json_str)
 
     return jsonify({"status": "success", "message": "Data received"})
