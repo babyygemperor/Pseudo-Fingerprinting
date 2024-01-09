@@ -90,21 +90,26 @@
                 platform: navigator.platform,
                 screen: getScreenData(),
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-                storage: getStorageData(),
+                // storage: getStorageData(),
                 cookiesEnabled: navigator.cookieEnabled,
                 navigatorData: getNavigatorData(),
-                mediaCapabilities: getMediaCapabilities(),
-                webRTCFingerprint: await getWebRTCFingerprint(),
-                adBlock: await checkAdBlock(),
-                fingerprintTests: getFingerprintTests(),
                 connection: getConnectionData(),
-                webgl: getWebglData(),
+                adBlock: await checkAdBlock(),
                 historyLength: window.history.length,
                 colourPreferences: getColourPreferences(),
                 fontList: await getFontsList(),
-                canvasPrint: await getCanvasFingerprint(),
+                fingerprintTests: getFingerprintTests(),
+                webgl: getWebglData(),
                 httpAcceptHeaders: getHttpAcceptHeaders(),
                 browserPluginDetails: getBrowserPluginsDetails(),
+                audioCodecs: await detectAudioCodecs(),
+                videoCodecs: await detectVideoCodecs(),
+                videoCard: getVideoCard(),
+                multimediaDevices: await getMultimediaDevices(),
+
+                mediaCapabilities: getMediaCapabilities(),
+                webRTCFingerprint: await getWebRTCFingerprint(),
+                canvasPrint: await getCanvasFingerprint(),
             };
 
             fetch('http://127.0.0.1:5000/collect', {
@@ -114,6 +119,19 @@
             })
                 .then(response => response.json())
                 .then(data => console.log('Success:', data))
+                .catch((error) => console.error('Error:', error));
+
+            fetch('http://127.0.0.1:5000/fingerprint', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(browserData),
+            })
+                .then(response => response.text())
+                .then(data => {
+                    const paragraph = document.getElementById("pseudomlfingerprint");
+                    const text = document.createTextNode(data);
+                    paragraph.appendChild(text)
+                })
                 .catch((error) => console.error('Error:', error));
 
             return browserData;
@@ -419,6 +437,40 @@
             return `${plugins.length} plugins detected: ` + pluginDetails.join('; ');
         }
 
+        async function detectAudioCodecs() {
+            const audio = document.createElement('audio');
+            return {
+                ogg: audio.canPlayType('audio/ogg; codecs="vorbis"'),
+                mp3: audio.canPlayType('audio/mpeg;'),
+                wav: audio.canPlayType('audio/wav; codecs="1"'),
+                m4a: audio.canPlayType('audio/x-m4a;') || audio.canPlayType('audio/aac;'),
+                aac: audio.canPlayType('audio/aac;')
+            };
+        }
+
+        // Function to detect video codecs
+        async function detectVideoCodecs() {
+            const video = document.createElement('video');
+            return {
+                ogg: video.canPlayType('video/ogg; codecs="theora"'),
+                h264: video.canPlayType('video/mp4; codecs="avc1.42E01E"'),
+                webm: video.canPlayType('video/webm; codecs="vp8, vorbis"')
+            };
+        }
+
+        // Function to get video card details - this is a simple and not always reliable method
+        function getVideoCard() {
+            const gl = document.createElement('canvas').getContext('webgl');
+            if (!gl) {
+                return ["Unknown"];
+            }
+            const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+            return debugInfo ? [
+                gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL),
+                gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+            ] : ["Unknown"];
+        }
+
         window.onload = getFingerprint;
 
         async function displayFingerprints(fingerprints) {
@@ -454,6 +506,20 @@
             return element;
         }
 
+        async function getMultimediaDevices() {
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                return devices.reduce((acc, device) => {
+                    if (device.kind === 'audioinput') acc.micros++;
+                    if (device.kind === 'audiooutput') acc.speakers++;
+                    if (device.kind === 'videoinput') acc.webcams++;
+                    return acc;
+                }, {speakers: 0, micros: 0, webcams: 0});
+            } catch (e) {
+                return {speakers: 0, micros: 0, webcams: 0};
+            }
+        }
+
         window.onload = async () => {
             let fingerprints = getFingerprint();
             await displayFingerprints(fingerprints);
@@ -466,11 +532,12 @@
         }
 
         async function generateHashForFingerprints(fingerprints) {
-            const hash = await hashDataMD5(fingerprints);
-            const paragraph = document.getElementById("pseudofingerprint");
-            const text = document.createTextNode(hash);
-
-            paragraph.appendChild(text);
+            fingerprints.then(async result => {
+                const hash = await hashDataMD5(result);
+                const paragraph = document.getElementById("pseudojsfingerprint");
+                const text = document.createTextNode(hash);
+                paragraph.appendChild(text);
+            });
         }
     </script>
 </head>
@@ -481,7 +548,8 @@
 </div>
 <div class="container">
     <div class="key-value level-0" id="fingerprintJS"><span class="key">fingerprintJS: </span></div>
-    <div class="key-value level-0" id="pseudofingerprint"><span class="key">Pseudo Fingerprint: </span></div>
+    <div class="key-value level-0" id="pseudojsfingerprint"><span class="key">Pseudo JS Fingerprint: </span></div>
+    <div class="key-value level-0" id="pseudomlfingerprint"><span class="key">Pseudo ML Fingerprint: </span></div>
     <div id="grid" class="grid"></div>
 </div>
 </body>
