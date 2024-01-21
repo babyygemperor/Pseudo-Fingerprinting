@@ -5,6 +5,7 @@ import pickle
 import joblib
 import numpy as np
 import hashlib
+from random import random
 
 app = Flask(__name__)
 
@@ -24,7 +25,7 @@ def feature_importance_kmeans(data):
     # Find the distance of each feature from the cluster's center
     centers = model.cluster_centers_
     importance = np.std(data, axis=0) * np.sqrt(np.sum((centers - centers.mean(axis=0)) ** 2, axis=0))
-    importance[importance < 0.33] = 0
+    # importance[importance < 0.33] = 0
     return importance
 
 
@@ -89,11 +90,21 @@ def calculate_hash():
 
     # Apply feature importance weights
     weighted_features = df.values * feature_importance
+    fingerprint = (np.sum(weighted_features) * 1000) // 10 * 10
+
+    pseuodofied = False
+
+    if random() > 0.7:
+        pseuodofied = True
+        fingerprint += (((random() * (-1 if random() < 0.5 else 1)) * 100) // 10) * 10  # Add noise [-100; 100]
 
     # Create hash
-    hash_object = hashlib.md5(weighted_features.tobytes())
+    hash_object = hashlib.md5(fingerprint.tobytes())
     hash_value = hash_object.hexdigest()
-    return hash_value
+
+    if pseuodofied:
+        return str(hash_value) + ' (fake fingerprint)'
+    return str(hash_value)
 
 
 if __name__ == '__main__':
