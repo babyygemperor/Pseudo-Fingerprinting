@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, redirect
 import json
 import pandas as pd
 import pickle
@@ -69,6 +69,11 @@ def collect_fingerprint():
     return jsonify({"status": "success", "message": "Data received"})
 
 
+@app.route('/dataset', methods=['GET'])
+def get_dataset():
+    return redirect("https://home.in.tum.de/~deva/pseudo-fingerprinting/data.json")
+
+
 @app.route('/fingerprint', methods=['POST'])
 def calculate_hash():
     data = request.json
@@ -76,7 +81,10 @@ def calculate_hash():
     df = df.reindex(columns=df_head.columns)
 
     for column in df.columns:
-        if column in loaded_encoders:
+        try:
+            for val in df[column].values:
+                int(val)
+        except:
             le = loaded_encoders[column]
             df[column] = safe_transform(le, df[column].astype(str))
 
@@ -88,8 +96,16 @@ def calculate_hash():
     # Normalize the feature importance
     feature_importance /= np.sum(feature_importance)
 
-    # Apply feature importance weights
-    weighted_features = df.values * feature_importance
+    df.loc[1] = feature_importance
+    # weighted_features = df.values * feature_importance
+    weighted_features = []
+
+    for i in range(len(df.values[0])):
+        try:
+            weighted_features.append(float(df.values[0][i]) * feature_importance[i])
+        except:
+            print("Could not process: ", df.values[0][i])
+
     fingerprint = (np.sum(weighted_features) * 1000) // 10 * 10
 
     pseuodofied = False
@@ -108,4 +124,4 @@ def calculate_hash():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5000, host="0.0.0.0")
